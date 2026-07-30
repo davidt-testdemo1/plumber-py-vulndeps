@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # Dockerfile is added by this pull request.
       - name: Build application image
         run: docker build -t app:${{ github.sha }} .
       - name: Detect CodeQL languages
@@ -50,10 +49,14 @@ jobs:
       - name: Unit tests
         run: |
           if [ -f package.json ]; then
+            # Install before testing: a container build leaves the runner with no
+            # node_modules, so the repo's test binary would not exist.
+            if [ -f package-lock.json ]; then npm ci; else npm install; fi
             npm test --if-present
           elif [ -f go.mod ]; then
             go test ./...
           elif [ -f pyproject.toml ] || [ -f requirements.txt ]; then
+            if [ -f requirements.txt ]; then python -m pip install -r requirements.txt >/dev/null 2>&1 || true; fi
             python -m pip install pytest >/dev/null 2>&1 && pytest --no-header -q || echo "No pytest suite."
           else
             echo "No recognized test manifest. Skipping tests."
