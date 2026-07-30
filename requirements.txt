@@ -1,0 +1,12 @@
+# DELIBERATELY VULNERABLE — Plumber campaign fixture (lane B2).
+#
+# Every pin below has a HIGH or CRITICAL advisory that is FIXED in a later
+# release, so Trivy reports it even with --ignore-unfixed and the deterministic
+# dependency-bump remediation has somewhere to go. Do not "fix" this file: the
+# point of the fixture is that the pipeline fixes it.
+Django==2.2.0
+requests==2.19.1
+urllib3==1.24.1
+Jinja2==2.10
+PyYAML==5.1
+gunicorn==19.9.0
