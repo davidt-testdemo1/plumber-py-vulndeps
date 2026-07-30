@@ -3,6 +3,16 @@
 FROM python:3.12-slim AS build
 WORKDIR /app
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
+# Build toolchain for dependencies that ship no wheel for this platform. Very
+# common in real requirements files (multidict, psycopg2, lxml, cryptography on
+# older pins): without gcc, `pip install` dies with
+# "error: command 'gcc' failed: No such file or directory" and the whole pipeline
+# fails at the build gate. This is the BUILD stage of a multi-stage build and only
+# /opt/venv is copied forward, so none of it reaches the runtime image or its
+# vulnerability surface.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt ./
