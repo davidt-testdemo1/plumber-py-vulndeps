@@ -68,4 +68,4 @@ jobs:
           EFFECTIVE_STAGE="${STAGE:-dev}"
           STAGE_TAG=""
           [ -n "$EFFECTIVE_STAGE" ] && STAGE_TAG="tudovu:stage=$EFFECTIVE_STAGE"
-          aws cloudformation deploy --template-file infra/app.yaml --stack-name "$APP_STACK" --capabilities CAPABILITY_IAM --region us-east-1 --tags "tudovu:repo=$REPO_FULL" tudovu:customer=plumber-exam $STAGE_TAG --parameter-overrides ImageUri="$IMAGE" VpcId="$VPC_ID" PublicSubnetIds="$SUBNET_IDS"
+          aws cloudformation deploy --template-file infra/app.yaml --stack-name "$APP_STACK" --capabilities CAPABILITY_IAM --region us-east-1 --tags "tudovu:repo=$REPO_FULL" $STAGE_TAG --parameter-overrides ImageUri="$IMAGE" VpcId="$VPC_ID" PublicSubnetIds="$SUBNET_IDS"
