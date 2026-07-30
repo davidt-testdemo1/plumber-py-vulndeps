@@ -192,6 +192,8 @@ Resources:
               Value: !Ref EnvCi
             - Name: DJANGO_SETTINGS_MODULE
               Value: !Ref EnvDjangoSettingsModule
+            - Name: PYTHONUNBUFFERED
+              Value: "1"
             - Name: APP_BUCKET
               Value: !Ref AppBucket
           Secrets:
