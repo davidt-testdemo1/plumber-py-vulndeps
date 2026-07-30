@@ -17,22 +17,6 @@ Parameters:
   DesiredCount:
     Type: Number
     Default: 2
-  EnvEnvironment:
-    Type: String
-    Default: ""
-    Description: ENVIRONMENT for the app container.
-  EnvDyno:
-    Type: String
-    Default: ""
-    Description: DYNO for the app container.
-  EnvCi:
-    Type: String
-    Default: ""
-    Description: CI for the app container.
-  EnvDjangoSettingsModule:
-    Type: String
-    Default: ""
-    Description: DJANGO_SETTINGS_MODULE for the app container.
 
 Resources:
   AlbSecurityGroup:
@@ -53,8 +37,8 @@ Resources:
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 3000
-          ToPort: 3000
+          FromPort: 9090
+          ToPort: 9090
           SourceSecurityGroupId: !Ref AlbSecurityGroup
 
   LoadBalancer:
@@ -70,7 +54,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       VpcId: !Ref VpcId
-      Port: 3000
+      Port: 9090
       Protocol: HTTP
       TargetType: ip
       HealthCheckPath: /
@@ -115,32 +99,6 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-      Policies:
-        - PolicyName: read-secrets
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource:
-                  - !Ref SecretDjangoSecretKey
-                  - !Ref SecretDatabaseUrl
-
-  SecretDjangoSecretKey:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Description: !Sub "DJANGO_SECRET_KEY for ${AWS::StackName}"
-      GenerateSecretString:
-        PasswordLength: 50
-        ExcludePunctuation: true
-
-  SecretDatabaseUrl:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Description: !Sub "DATABASE_URL for ${AWS::StackName}"
-      GenerateSecretString:
-        PasswordLength: 50
-        ExcludePunctuation: true
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -181,24 +139,11 @@ Resources:
         - Name: app
           Image: !Ref ImageUri
           PortMappings:
-            - ContainerPort: 3000
+            - ContainerPort: 9090
           Essential: true
           Environment:
-            - Name: ENVIRONMENT
-              Value: !Ref EnvEnvironment
-            - Name: DYNO
-              Value: !Ref EnvDyno
-            - Name: CI
-              Value: !Ref EnvCi
-            - Name: DJANGO_SETTINGS_MODULE
-              Value: !Ref EnvDjangoSettingsModule
             - Name: APP_BUCKET
               Value: !Ref AppBucket
-          Secrets:
-            - Name: DJANGO_SECRET_KEY
-              ValueFrom: !Ref SecretDjangoSecretKey
-            - Name: DATABASE_URL
-              ValueFrom: !Ref SecretDatabaseUrl
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -223,7 +168,7 @@ Resources:
             - !Ref ServiceSecurityGroup
       LoadBalancers:
         - ContainerName: app
-          ContainerPort: 3000
+          ContainerPort: 9090
           TargetGroupArn: !Ref TargetGroup
 
   AppBucket:
