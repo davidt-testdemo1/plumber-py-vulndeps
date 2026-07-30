@@ -6,13 +6,13 @@
 # somewhere to go. An earlier revision pinned versions that could not install at all
 # (Django 2.2 on py3.12, urllib3 1.24 conflicting with requests), which failed the
 # BUILD gate instead of the SCAN gate and so tested the wrong thing.
-Django==4.2.0
-gunicorn==21.2.0
+Django==4.2.30
+gunicorn==22.0.0
 dj-database-url==2.1.0
 psycopg2-binary==2.9.9
 whitenoise==6.6.0
 requests==2.31.0
-Pillow==10.2.0
-aiohttp==3.9.0
-cryptography==42.0.0
-setuptools==69.0.0
+Pillow==12.3.0
+aiohttp==3.13.3
+cryptography==48.0.1
+setuptools==78.1.1
