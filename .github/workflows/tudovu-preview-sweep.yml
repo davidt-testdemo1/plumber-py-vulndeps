@@ -1,0 +1,82 @@
+# .github/workflows/tudovu-preview-sweep.yml — delete previews whose teardown did not run.
+#
+# The per-PR workflow deletes on close. This is the backstop for when that does not happen: a
+# cancelled job, a revoked token, a branch deleted mid-run. Each one otherwise leaves a load
+# balancer billing about $0.55 a day with nothing ever coming back for it.
+#
+# It only ever touches stacks named tudovu-preview-<repo>-pr<N> that are past their
+# recorded expiry. The role it runs as cannot reach any other stack.
+name: Tudovu Preview Sweep
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    environment: tudovu-preview
+    steps:
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TUDOVU_PREVIEW_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: List the pull requests worth checking
+        id: prs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // The stack name is deterministic from the PR number, so the pull request list is the
+            // index. Listing stacks would need a permission this role deliberately does not have.
+            const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            const prs = await github.paginate(github.rest.pulls.list, {
+              ...context.repo, state: 'all', sort: 'updated', direction: 'desc', per_page: 100,
+            }, (r, done) => {
+              if (r.data.every((p) => new Date(p.updated_at).getTime() < cutoff)) done();
+              return r.data;
+            });
+            const numbers = prs.filter((p) => new Date(p.updated_at).getTime() >= cutoff).map((p) => p.number);
+            core.setOutput('numbers', numbers.join(' '));
+            core.info('checking ' + numbers.length + ' pull requests');
+      - name: Delete the expired ones
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUMBERS: ${{ steps.prs.outputs.numbers }}
+        run: |
+          SLUG=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/-\{2,\}/-/g; s/^-//; s/-$//')
+          NOW=$(date -u +%s)
+          SWEPT=0
+          {
+            echo "## Preview sweep"
+            echo ""
+            echo "| stack | expires | action |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for N in $PR_NUMBERS; do
+            STACK="tudovu-preview-${SLUG}-pr${N}"
+            EXPIRES=$(aws cloudformation describe-stacks --stack-name "$STACK" --region us-east-1 \
+              --query "Stacks[0].Tags[?Key=='tudovu:expires-at'].Value | [0]" --output text 2>/dev/null || echo "")
+            # No stack, or no answer: nothing to do. Absence is the normal case by a wide margin.
+            [ -z "$EXPIRES" ] || [ "$EXPIRES" = "None" ] && continue
+            EXP=$(date -u -d "$EXPIRES" +%s 2>/dev/null || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$EXPIRES" +%s 2>/dev/null || echo "")
+            if [ -z "$EXP" ]; then
+              # An unreadable expiry is NOT an expired one. Reported, never deleted.
+              echo "| \`$STACK\` | $EXPIRES | **unreadable — left alone** |" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [ "$NOW" -gt "$EXP" ]; then
+              aws cloudformation delete-stack --stack-name "$STACK" --region us-east-1 || true
+              echo "| \`$STACK\` | $EXPIRES | deleted |" >> "$GITHUB_STEP_SUMMARY"
+              SWEPT=$((SWEPT + 1))
+            else
+              echo "| \`$STACK\` | $EXPIRES | still live |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Swept $SWEPT expired preview(s)." >> "$GITHUB_STEP_SUMMARY"
