@@ -8,6 +8,8 @@
 # recorded expiry. The role it runs as cannot reach any other stack.
 name: Tudovu Preview Sweep
 on:
+  push:
+    paths: ['.github/workflows/tudovu-preview-sweep.yml']
   schedule:
     - cron: '41 3 * * *'
   workflow_dispatch: {}
